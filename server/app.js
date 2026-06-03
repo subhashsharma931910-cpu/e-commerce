@@ -1,0 +1,35 @@
+import { config } from "dotenv";
+config({ path: "./config/config.env" });
+
+import express from "express";
+import cors from "cors";
+import fileUpload from "express-fileupload";
+import cookieParser from "cookie-parser";
+import { createTables } from "./utils/createTables.js";
+import { errorMiddleware } from "./middlewares/errorMiddleware.js";
+import authRouter from './router/authRoutes.js'
+
+const app = express();
+
+app.use(cors({
+  origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
+}))
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+app.use(fileUpload({
+  tempFileDir: '/uploads',
+  useTempFiles: true,
+}))
+
+app.use("/api/v1/auth", authRouter)
+
+createTables()
+
+app.use(errorMiddleware)
+
+export default app;

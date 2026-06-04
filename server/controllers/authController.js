@@ -6,12 +6,20 @@ import { sendToken } from "../utils/jwtToken.js";
 import { generateResetPasswordToken } from "../utils/generateResetPasswordToken.js";
 import { generateEmailTemplate } from "../utils/generateForgotPasswordEmailTemplate.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { createHash } from "crypto";
 
 export const register = catchAsyncErrors(async (req, res, next) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) {
     return next(new ErrorHandler("Please enter all fields", 400));
   }
+
+  if (password.length < 8 || password.length > 16) {
+    return next(
+      new ErrorHandler("Password must be between 8 and 16 characters.", 400),
+    );
+  }
+
   const isAlreadyRegistered = await database.query(
     `SELECT * FROM users WHERE email = $1`,
     [email],
@@ -68,7 +76,6 @@ export const logout = catchAsyncErrors(async (req, res, next) => {
     });
 });
 
-
 export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
   const { email } = req.body;
   const { frontendUrl } = req.query;
@@ -109,4 +116,36 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
     );
     return next(new ErrorHandler("Email could not be sent.", 500));
   }
+});
+
+export const resetPassword = catchAsyncErrors(async (req, res, next) => {
+  const { token } = req.params;
+  const resetPasswordToken = createHash("sha256").update(token).digest("hex");
+  const user = await database.query(
+    "SELECT * FROM users WHERE reset_password_token = $1 AND reset_password_expires > NOW()",
+    [resetPasswordToken],
+  );
+  if (user.rows.length === 0) {
+    return next(new ErrorHandler("Invalid or expired reset token.", 400));
+  }
+  if (req.body.password !== req.body.confirmPassword) {
+    return next(new ErrorHandler("Passwords do not match.", 400));
+  }
+  if (
+    req.body.password?.length < 8 ||
+    req.body.password?.length > 16 ||
+    req.body.confirmPassword?.length < 8 ||
+    req.body.confirmPassword?.length > 16
+  ) {
+    return next(
+      new ErrorHandler("Password must be between 8 and 16 characters.", 400),
+    );
+  }
+  const hashedPassword = await bcrypt.hash(req.body.password, 10);
+
+  const updatedUser = await database.query(
+    `UPDATE users SET password = $1, reset_password_token = NULL, reset_password_expires = NULL WHERE id = $2 RETURNING *`,
+    [hashedPassword, user.rows[0].id],
+  );
+  sendToken(updatedUser.rows[0], 200, "Password reset successfully", res);
 });

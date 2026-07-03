@@ -63,18 +63,18 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
 
   // Filter products by availability
   if (availability === "in-stock") {
-    conditions.push(`stock > 5`);
+    conditions.push(`p.stock > 5`);
   } else if (availability === "limited") {
-    conditions.push(`stock > 0 AND stock <= 5`);
+    conditions.push(`p.stock > 0 AND p.stock <= 5`);
   } else if (availability === "out-of-stock") {
-    conditions.push(`stock = 0`);
+    conditions.push(`p.stock = 0`);
   }
 
   // Filter products by price
   if (price) {
     const [minPrice, maxPrice] = price.split("-");
     if (minPrice && maxPrice) {
-      conditions.push(`price BETWEEN $${index} AND $${index + 1}`);
+      conditions.push(`p.price BETWEEN $${index} AND $${index + 1}`);
       values.push(minPrice, maxPrice);
       index += 2;
     }
@@ -82,21 +82,23 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
 
   // Filter products by category
   if (category) {
-    conditions.push(`category ILIKE $${index}`);
+    conditions.push(`p.category ILIKE $${index}`);
     values.push(`%${category}%`);
     index++;
   }
 
   // Filter products by rating
   if (ratings) {
-    conditions.push(`ratings >= $${index}`);
+    conditions.push(`p.ratings >= $${index}`);
     values.push(ratings);
     index++;
   }
 
   // Add search query
   if (search) {
-    conditions.push(`(p.name ILIKE ₹${index} OR p.description ILIKE ${index})`);
+    conditions.push(
+      `(p.name ILIKE $${index} OR p.description ILIKE $${index})`,
+    );
     values.push(`%${search}%`);
     index++;
   }
@@ -343,12 +345,11 @@ export const postProductReview = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-
 export const deleteReview = catchAsyncErrors(async (req, res, next) => {
   const { productId } = req.params;
   const review = await database.query(
     "DELETE FROM reviews WHERE product_id = $1 AND user_id = $2 RETURNING *",
-    [productId, req.user.id]
+    [productId, req.user.id],
   );
 
   if (review.rows.length === 0) {
@@ -357,7 +358,7 @@ export const deleteReview = catchAsyncErrors(async (req, res, next) => {
 
   const allReviews = await database.query(
     `SELECT AVG(rating) AS avg_rating FROM reviews WHERE product_id = $1`,
-    [productId]
+    [productId],
   );
 
   const newAvgRating = allReviews.rows[0].avg_rating;
@@ -366,7 +367,7 @@ export const deleteReview = catchAsyncErrors(async (req, res, next) => {
     `
         UPDATE products SET ratings = $1 WHERE id = $2 RETURNING *
         `,
-    [newAvgRating, productId]
+    [newAvgRating, productId],
   );
 
   res.status(200).json({
@@ -375,7 +376,7 @@ export const deleteReview = catchAsyncErrors(async (req, res, next) => {
     review: review.rows[0],
     product: updatedProduct.rows[0],
   });
-});  
+});
 
 export const fetchAIFilteredProducts = catchAsyncErrors(
   async (req, res, next) => {
@@ -482,7 +483,7 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
         OR category ILIKE ANY($1)
         LIMIT 200;     
         `,
-      [keywords]
+      [keywords],
     );
 
     const filteredProducts = result.rows;
@@ -496,17 +497,24 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
     }
 
     // STEP 2: AI FILTERING
-    const { success, products } = await getAIRecommendation(
-      req,
-      res,
-      userPrompt,
-      filteredProducts
-    );
+    let aiResult;
+    try {
+      aiResult = await getAIRecommendation(userPrompt, filteredProducts);
+    } catch (error) {
+      return res.status(200).json({
+        success: true,
+        message:
+          "AI service is unavailable. Showing keyword-filtered products instead.",
+        products: filteredProducts,
+      });
+    }
 
     res.status(200).json({
-      success: success,
-      message: "AI filtered products.",
-      products,
+      success: true,
+      message: aiResult.fallback
+        ? "AI returned no strong matches. Showing keyword-filtered products."
+        : "AI filtered products.",
+      products: aiResult.products,
     });
-  }
+  },
 );

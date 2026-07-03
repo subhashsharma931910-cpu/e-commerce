@@ -85,7 +85,7 @@ export const placeNewOrder = catchAsyncErrors(async (req, res, next) => {
   });
 
   const tax_price = 0.18;
-  const shipping_price = total_price >= 50 ? 0 : 2;
+  const shipping_price = total_price >= 500 ? 0 : 40;
   total_price = Math.round(
     total_price + total_price * tax_price + shipping_price,
   );
@@ -144,7 +144,9 @@ json_build_object(
 'order_id', oi.order_id,
 'product_id', oi.product_id,
 'quantity', oi.quantity,
-'price', oi.price
+'price', oi.price,
+'image', oi.image,
+'title', oi.title
  )
  ) FILTER (WHERE oi.id IS NOT NULL), '[]'
  ) AS order_items,
@@ -201,7 +203,7 @@ export const fetchMyOrders = catchAsyncErrors(async (req, res, next) => {
    FROM orders o
    LEFT JOIN order_items oi ON o.id = oi.order_id
    LEFT JOIN shipping_info s ON o.id = s.order_id
-  WHERE o.buyer_id = $1
+  WHERE o.buyer_id = $1 AND o.paid_at IS NOT NULL
   GROUP BY o.id, s.id
           `,
     [req.user.id],
@@ -239,6 +241,7 @@ export const fetchAllOrders = catchAsyncErrors(async (req, res, next) => {
 FROM orders o
 LEFT JOIN order_items oi ON o.id = oi.order_id
 LEFT JOIN shipping_info s ON o.id = s.order_id
+WHERE o.paid_at IS NOT NULL
 GROUP BY o.id, s.id
         `);
 

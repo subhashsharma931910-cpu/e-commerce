@@ -1,8 +1,7 @@
-import { config } from "dotenv";
-
-config({ path: "./config/config.env" });
-
 import express from "express";
+import { config } from "dotenv";
+config();
+
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import fileUpload from "express-fileupload";
@@ -16,6 +15,7 @@ import Stripe from "stripe";
 import database from "./database/db.js";
 
 const app = express();
+config();
 
 app.use(
   cors({

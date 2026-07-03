@@ -1,20 +1,15 @@
 import database from "../database/db.js";
 import Stripe from "stripe";
+import { config } from "dotenv";
+
+config();
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export async function generatePaymentIntent(orderId, totalPrice) {
   try {
-    const secret = process.env.STRIPE_SECRET_KEY;
-    if (!secret) {
-      console.error("Stripe Error: STRIPE_SECRET_KEY not set");
-      return { success: false, message: "Payment configuration missing." };
-    }
-
-    const stripe = new Stripe(secret, {
-      apiVersion: "2023-08-16",
-    });
-
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(totalPrice * 100),
+    const paymentIntern = await stripe.paymentIntent.create({
+      amount: totalPrice * 100, // Convert to cents
       currency: "usd",
     });
 

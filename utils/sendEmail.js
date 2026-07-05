@@ -2,7 +2,7 @@ import nodeMailer from "nodemailer";
 
 export const sendEmail = async ({ email, subject, message }) => {
   const transporter = nodeMailer.createTransport({
-    host: process.env.SMTP_HOST,
+    host: "smtp.gmail.com",
     port: 587,
     secure: false,
     requireTLS: true,

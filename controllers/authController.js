@@ -113,6 +113,7 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
       message: `Email sent to ${user.email} successfully.`,
     });
   } catch (error) {
+    console.error("Email send error:", error);
     await database.query(
       `UPDATE users SET reset_password_token = NULL, reset_password_expires = NULL WHERE email = $1`,
       [email],

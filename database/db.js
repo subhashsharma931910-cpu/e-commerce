@@ -4,8 +4,6 @@ const { Client } = pkg;
 
 config()
 
-console.log(process.env.DB_PASSWORD)
-
 const database = new Client({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
